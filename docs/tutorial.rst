@@ -13,172 +13,263 @@
 .. _mod_wsgi: http://code.google.com/p/modwsgi/
 .. _Paste: http://pythonpaste.org/
 .. _Pound: http://www.apsis.ch/pound/
-.. _`WSGI Specification`: http://www.wsgi.org/wsgi/
+.. _`WSGI Specification`: http://www.wsgi.org/
 .. _issue: http://github.com/defnull/bottle/issues
 .. _Python: http://python.org/
 .. _SimpleCookie: http://docs.python.org/library/cookie.html#morsel-objects
 .. _testing: http://github.com/defnull/bottle/raw/master/bottle.py
 
-=============
-Documentation
-=============
+========
+Tutorial
+========
 
-This tutorial introduces you to the concepts and features of the Bottle web framework. If you have questions not answered here, please check the :doc:`faq` page, file a ticket at the issue_ tracker or send an e-mail to the `mailing list <mailto:bottlepy@googlegroups.com>`_.
+This tutorial introduces you to the concepts and features of the Bottle web framework and covers basic and advanced topics alike. You can read it from start to end, or use it as a reference later on. The automatically generated :doc:`api` may be interesting for you, too. It covers more details, but explains less than this tutorial. Solutions for the most common questions can be found in our :doc:`recipes` collection or on the :doc:`faq` page. If you need any help, join our `mailing list <mailto:bottlepy@googlegroups.com>`_ or visit us in our `IRC channel <http://webchat.freenode.net/?channels=bottlepy>`_.
 
-.. note::
+.. _installation:
 
-    This is a copy&paste from the old docs and a work in progress. Handle with care :)
-
-.. rubric:: A quick overview:
-
-* :ref:`tutorial-routing`: Web development starts with binding URLs to code. This section tells you how to do it.
-* :ref:`tutorial-output`: You have to return something to the Browser. Bottle makes it easy for you, supporting more than just plain strings.
-* :ref:`tutorial-request`: Each client request carries a lot of information. HTTP-headers, form data and cookies to name just three. Here is how to use them.
-* :ref:`tutorial-templates`: You don't want to clutter your Python code with HTML fragments, do you? Templates separate code from presentation.
-* :ref:`tutorial-debugging`: These tools and features will help you during development.
-* :ref:`tutorial-deployment`: Get it up and running.
-
-
-
-Getting started
-===================
-
-Bottle has no dependencies, so all you need is Python_ (2.5 up to 3.x should work fine) and the :ref:`bottle module <download>` file. Lets start with a very basic "Hello World" example::
-
-    from bottle import route, run
-    
-    @route('/hello')
-    def hello():
-        return "Hello World!"
-    
-    run(host='localhost', port=8080)
-
-Whats happening here?
-
-1. First we import some bottle components. The :func:`route` decorator and the :func:`run` function. 
-2. The :func:`route` :term:`decorator` is used do bind a piece of code to an URL. In this example we want to answer requests to the ``/hello`` URL.
-3. This function is the :term:`handler function` or :term:`callback` for the ``/hello`` route. It is called every time someone requests the ``/hello`` URL and is responsible for generating the page content.
-4. In this example we simply return a string to the browser.
-5. Now it is time to start the actual HTTP server. The default is a development server running on 'localhost' port 8080 and serving requests until you hit :kbd:`Control-c`.
-
-This is it. Run this script, visit http://localhost:8080/hello and you will see "Hello World!" in your browser. Of cause this is a very simple example, but it shows the basic concept of how applications are built with bottle. Continue reading and you'll see what else is possible.
-
-
-.. note::
-    For the sake of simplicity, most examples in this tutorial use a module-level :func:`route` decorator to bind routes. This decorator adds routes to a global application object that is created automatically in the background. If you prefer a more explicit way to define your application and don't mind the extra typing, you can create a separate application object and use that instead of the global one. The object-oriented approach is further described in the :ref:`default-app` section. Just keep in mind that you have a choice.
-    
-.. _tutorial-routing:
-
-Routing
+Installation
 ==============================================================================
 
-As you have learned before, *routes* are used to map URLs to callback functions. These functions are executed on every request that matches the route and their return value is returned to the browser. You can add any number of routes to a callback using the :func:`route` decorator.
+Bottle does not depend on any external libraries. You can just download `bottle.py </bottle.py>`_ into your project directory and start coding:
 
-::
+.. code-block:: bash
 
-    from bottle import route
-    
-    @route('/')
-    @route('/index.html')
-    def index():
-        return "<a href='/hello'>Go to Hello World page</a>"
-    
+    $ wget http://bottlepy.org/bottle.py
+
+This will get you the latest development snapshot that includes all the new features. If you prefer a more stable environment, you should stick with the stable releases. These are available on `PyPI <http://pypi.python.org/pypi/bottle>`_ and can be installed via :command:`pip` (recommended), :command:`easy_install` or your package manager:
+
+.. code-block:: bash
+
+    $ sudo pip install bottle              # recommended
+    $ sudo easy_install bottle             # alternative without pip
+    $ sudo apt-get install python-bottle   # works for debian, ubuntu, ...
+
+Either way, you'll need Python 2.5 or newer (including 3.x) to run bottle applications. If you do not have permissions to install packages system-wide or simply don't want to, create a `virtualenv <http://pypi.python.org/pypi/virtualenv>`_ first:
+
+.. code-block:: bash
+
+    $ virtualenv develop              # Create virtual environment
+    $ source develop/bin/activate     # Change default python to virtual one
+    (develop)$ pip install -U bottle  # Install bottle to virtual environment
+
+Or, if virtualenv is not installed on your system:
+
+.. code-block:: bash
+
+    $ wget https://raw.github.com/pypa/virtualenv/master/virtualenv.py
+    $ python virtualenv.py develop    # Create virtual environment
+    $ source develop/bin/activate     # Change default python to virtual one
+    (develop)$ pip install -U bottle  # Install bottle to virtual environment
+
+
+
+Quickstart: "Hello World"
+==============================================================================
+
+This tutorial assumes you have Bottle either :ref:`installed <installation>` or copied into your project directory. Let's start with a very basic "Hello World" example::
+
+    from bottle import route, run
+
     @route('/hello')
     def hello():
         return "Hello World!"
 
-As you can see, URLs and routes have nothing to do with actual files on the web server. Routes are unique names for your callbacks, nothing more and nothing less. All URLs not covered by a route are answered with a "404 Page not found" error page.
+    run(host='localhost', port=8080, debug=True)
+
+This is it. Run this script, visit http://localhost:8080/hello and you will see "Hello World!" in your browser. Here is how it works:
+
+The :func:`route` decorator binds a piece of code to an URL path. In this case, we link the ``/hello`` path to the ``hello()`` function. This is called a `route` (hence the decorator name) and is the most important concept of this framework. You can define as many routes as you want. Whenever a browser requests an URL, the associated function is called and the return value is sent back to the browser. Its as simple as that.
+
+The :func:`run` call in the last line starts a built-in development server. It runs on ``localhost`` port ``8080`` and serves requests until you hit :kbd:`Control-c`. You can switch the server backend later, but for now a development server is all we need. It requires no setup at all and is an incredibly painless way to get your application up and running for local tests.
+
+The :ref:`tutorial-debugging` is very helpful during early development, but should be switched off for public applications. Keep that in mind.
+
+Of course this is a very simple example, but it shows the basic concept of how applications are built with Bottle. Continue reading and you'll see what else is possible.
+
+.. _tutorial-default:
+
+The Default Application
+------------------------------------------------------------------------------
+
+For the sake of simplicity, most examples in this tutorial use a module-level :func:`route` decorator to define routes. This adds routes to a global "default application", an instance of :class:`Bottle` that is automatically created the first time you call :func:`route`. Several other module-level decorators and functions relate to this default application, but if you prefer a more object oriented approach and don't mind the extra typing, you can create a separate application object and use that instead of the global one::
+
+    from bottle import Bottle, run
+
+    app = Bottle()
+
+    @app.route('/hello')
+    def hello():
+        return "Hello World!"
+
+    run(app, host='localhost', port=8080)
+
+The object-oriented approach is further described in the :ref:`default-app` section. Just keep in mind that you have a choice.
+
+
+
+
+.. _tutorial-routing:
+
+Request Routing
+==============================================================================
+
+In the last chapter we built a very simple web application with only a single route. Here is the routing part of the "Hello World" example again::
+
+    @route('/hello')
+    def hello():
+        return "Hello World!"
+
+The :func:`route` decorator links an URL path to a callback function, and adds a new route to the :ref:`default application <tutorial-default>`. An application with just one route is kind of boring, though. Let's add some more::
+
+    @route('/')
+    @route('/hello/<name>')
+    def greet(name='Stranger'):
+        return template('Hello {{name}}, how are you?', name=name)
+
+This example demonstrates two things: You can bind more than one route to a single callback, and you can add wildcards to URLs and access them via keyword arguments.
 
 
 
 .. _tutorial-dynamic-routes:
 
 Dynamic Routes
-------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 
-Bottle has a special syntax to add wildcards to a route and allow a single route to match a wide range of URLs. These *dynamic routes* are often used by blogs or wikis to create nice looking and meaningful URLs such as ``/archive/2010/04/21`` or ``/wiki/Page_Title``. Why? Because `cool URIs don't change <http://www.w3.org/Provider/Style/URI>`_. Let's add a ``:name`` wildcard to our last example::
+Routes that contain wildcards are called `dynamic routes` (as opposed to `static routes`) and match more than one URL at the same time. A simple wildcard consists of a name enclosed in angle brackets (e.g. ``<name>``) and accepts one or more characters up to the next slash (``/``). For example, the route ``/hello/<name>`` accepts requests for ``/hello/alice`` as well as ``/hello/bob``, but not for ``/hello``, ``/hello/`` or ``/hello/mr/smith``.
 
-    @route('/hello/:name')
-    def hello(name):
-        return "Hello %s!" % name
+Each wildcard passes the covered part of the URL as a keyword argument to the request callback. You can use them right away and implement RESTful, nice-looking and meaningful URLs with ease. Here are some other examples along with the URLs they'd match::
 
-This dynamic route will match ``/hello/alice`` as well as ``/hello/bob``. Each URL fragment covered by a wildcard is passed to the callback function as a keyword argument so you can use the information in your application.
+    @route('/wiki/<pagename>')            # matches /wiki/Learning_Python
+    def show_wiki_page(pagename):
+        ...
 
-Normal wildcards match everything up to the next slash. You can add a regular expression to change that::
+    @route('/<action>/<user>')            # matches /follow/defnull
+    def user_api(action, user):
+        ...
 
-    @route('/object/:id#[0-9]+#')
-    def view_object(id):
-        return "Object ID: %d" % int(id)
+.. versionadded:: 0.10
 
-As you can see, the keyword argument contains a string even if the wildcard is configured to only match digits. You have to explicitly cast it into an integer if you need to.
+Filters are used to define more specific wildcards, and/or transform the covered part of the URL before it is passed to the callback. A filtered wildcard is declared as ``<name:filter>`` or ``<name:filter:config>``. The syntax for the optional config part depends on the filter used.
+
+The following filters are implemented by default and more may be added:
+
+* **:int** matches (signed) digits only and converts the value to integer.
+* **:float** similar to :int but for decimal numbers.
+* **:path** matches all characters including the slash character in a non-greedy way and can be used to match more than one path segment.
+* **:re** allows you to specify a custom regular expression in the config field. The matched value is not modified.
+
+Let's have a look at some practical examples::
+
+    @route('/object/<id:int>')
+    def callback(id):
+        assert isinstance(id, int)
+
+    @route('/show/<name:re:[a-z]+>')
+    def callback(name):
+        assert name.isalpha()
+
+    @route('/static/<path:path>')
+    def callback(path):
+        return static_file(path, ...)
+
+You can add your own filters as well. See :doc:`Routing` for details.
+
+.. versionchanged:: 0.10
+
+The new rule syntax was introduced in **Bottle 0.10** to simplify some common use cases, but the old syntax still works and you can find a lot of code examples still using it. The differences are best described by example:
+
+=================== ====================
+Old Syntax          New Syntax
+=================== ====================
+``:name``           ``<name>``
+``:name#regexp#``   ``<name:re:regexp>``
+``:#regexp#``       ``<:re:regexp>``
+``:##``             ``<:re>``
+=================== ====================
+
+Try to avoid the old syntax in future projects if you can. It is not currently deprecated, but will be eventually.
+
 
 HTTP Request Methods
 ------------------------------------------------------------------------------
 
 .. __: http_method_
 
-The HTTP protocol defines several `request methods`__ (sometimes referred to as "verbs") for different tasks. GET is the default for all routes with no other method specified. These routes will match GET requests only. To handle other methods such as POST, PUT or DELETE, you may add a ``method`` keyword argument to the :func:`route` decorator or use one of the four alternative decorators: :func:`get`, :func:`post`, :func:`put` or :func:`delete`.
+The HTTP protocol defines several `request methods`__ (sometimes referred to as "verbs") for different tasks. GET is the default for all routes with no other method specified. These routes will match GET requests only. To handle other methods such as POST, PUT or DELETE, add a ``method`` keyword argument to the :func:`route` decorator or use one of the four alternative decorators: :func:`get`, :func:`post`, :func:`put` or :func:`delete`.
 
 The POST method is commonly used for HTML form submission. This example shows how to handle a login form using POST::
 
-    from bottle import get, post, request
+    from bottle import get, post, request # or route
 
-    #@route('/login')
-    @get('/login')
-    def login_form():
-        return '''<form method="POST">
-                    <input name="name"     type="text" />
-                    <input name="password" type="password" />
-                  </from>'''
+    @get('/login') # or @route('/login')
+    def login():
+        return '''
+            <form action="/login" method="post">
+                Username: <input name="username" type="text" />
+                Password: <input name="password" type="password" />
+                <input value="Login" type="submit" />
+            </form>
+        '''
 
-    #@route('/login', method='POST')
-    @post('/login')
-    def login_submit():
-        name     = request.forms.get('name')
+    @post('/login') # or @route('/login', method='POST')
+    def do_login():
+        username = request.forms.get('username')
         password = request.forms.get('password')
-        if check_login(name, password):
-            return "<p>Your login was correct</p>"
+        if check_login(username, password):
+            return "<p>Your login information was correct.</p>"
         else:
-            return "<p>Login failed</p>"
+            return "<p>Login failed.</p>"
 
-In this example the ``/login`` URL is bound to two distinct callbacks, one for GET requests and another for POST requests. The first one displays a HTML form to the user. The second callback is invoked on a form submission and checks the login credentials the user entered into the form. The use of :attr:`Request.forms` is further described in the :ref:`tutorial-request` section. 
+In this example the ``/login`` URL is linked to two distinct callbacks, one for GET requests and another for POST requests. The first one displays a HTML form to the user. The second callback is invoked on a form submission and checks the login credentials the user entered into the form. The use of :attr:`Request.forms` is further described in the :ref:`tutorial-request` section.
 
-.. rubric:: Automatic Fallbacks
+.. rubric:: Special Methods: HEAD and ANY
 
-The special HEAD method is used to ask for the response identical to the one that would correspond to a GET request, but without the response body. This is useful for retrieving meta-information about a resource without having to download the entire document. Bottle handles these requests automatically by falling back to the corresponding GET route and cutting off the request body, if present. You don't have to specify any HEAD routes yourself.
+The HEAD method is used to ask for the response identical to the one that would correspond to a GET request, but without the response body. This is useful for retrieving meta-information about a resource without having to download the entire document. Bottle handles these requests automatically by falling back to the corresponding GET route and cutting off the request body, if present. You don't have to specify any HEAD routes yourself.
 
 Additionally, the non-standard ANY method works as a low priority fallback: Routes that listen to ANY will match requests regardless of their HTTP method but only if no other more specific route is defined. This is helpful for *proxy-routes* that redirect requests to more specific sub-applications.
 
 To sum it up: HEAD requests fall back to GET routes and all requests fall back to ANY routes, but only if there is no matching route for the original request method. It's as simple as that.
 
+
+
 Routing Static Files
 ------------------------------------------------------------------------------
 
-Static files such as images or css files are not served automatically. You have to add a route and a callback to control which files get served and where to find them::
+Static files such as images or CSS files are not served automatically. You have to add a route and a callback to control which files get served and where to find them::
 
   from bottle import static_file
-  @route('/static/:filename')
+  @route('/static/<filename>')
   def server_static(filename):
       return static_file(filename, root='/path/to/your/static/files')
 
-The :func:`static_file` function is a helper to serve files in a safe and convenient way (see :ref:`tutorial-static-files`). This example is limited to files directly within the ``/path/to/your/static/files`` directory because the ``:filename`` wildcard won't match a path with a slash in it. To serve files in subdirectories too, we can loosen the wildcard a bit::
+The :func:`static_file` function is a helper to serve files in a safe and convenient way (see :ref:`tutorial-static-files`). This example is limited to files directly within the ``/path/to/your/static/files`` directory because the ``<filename>`` wildcard won't match a path with a slash in it. To serve files in subdirectories, change the wildcard to use the `path` filter::
 
-  @route('/static/:path#.+#')
-  def server_static(path):
-      return static_file(path, root='/path/to/your/static/files')
+  @route('/static/<filepath:path>')
+  def server_static(filepath):
+      return static_file(filepath, root='/path/to/your/static/files')
 
 Be careful when specifying a relative root-path such as ``root='./static/files'``. The working directory (``./``) and the project directory are not always the same.
+
+
+
+
+.. _tutorial-errorhandling:
 
 Error Pages
 ------------------------------------------------------------------------------
 
-If anything goes wrong Bottle displays an informative but fairly boring error page. You can override the default error pages using the :func:`error` decorator. It works similar to the :func:`route` decorator but expects an HTTP status code instead of a route::
+If anything goes wrong, Bottle displays an informative but fairly plain error page. You can override the default for a specific HTTP status code with the :func:`error` decorator::
 
+  from bottle import error
   @error(404)
   def error404(error):
       return 'Nothing here, sorry'
 
-The ``error`` parameter passed to the error handler is an instance of :exc:`HTTPError`.
+From now on, `404 File not Found` errors will display a custom error page to the user. The only parameter passed to the error-handler is an instance of :exc:`HTTPError`. Apart from that, an error-handler is quite similar to a regular request callback. You can read from :data:`request`, write to :data:`response` and return any supported data-type except for :exc:`HTTPError` instances.
+
+Error handlers are used only if your application returns or raises an :exc:`HTTPError` exception (:func:`abort` does just that). Changing :attr:`Request.status` or returning :exc:`HTTPResponse` won't trigger the error handler.
+
+
 
 
 
@@ -196,7 +287,7 @@ Dictionaries
     As mentioned above, Python dictionaries (or subclasses thereof) are automatically transformed into JSON strings and returned to the browser with the ``Content-Type`` header set to ``application/json``. This makes it easy to implement json-based APIs. Data formats other than json are supported too. See the :ref:`tutorial-output-filter` to learn more.
 
 Empty Strings, ``False``, ``None`` or other non-true values:
-    These produce an empty output with ``Content-Length`` header set to 0. 
+    These produce an empty output with the ``Content-Length`` header set to 0.
 
 Unicode strings
     Unicode strings (or iterables yielding unicode strings) are automatically encoded with the codec specified in the ``Content-Type`` header (utf8 by default) and then treated as normal byte strings (see below).
@@ -212,7 +303,7 @@ File objects
 
 Iterables and generators
     You are allowed to use ``yield`` within your callbacks or return an iterable, as long as the iterable yields byte strings, unicode strings, :exc:`HTTPError` or :exc:`HTTPResponse` instances. Nested iterables are not supported, sorry. Please note that the HTTP status code and the headers are sent to the browser as soon as the iterable yields its first non-empty value. Changing these later has no effect.
-  
+
 The ordering of this list is significant. You may for example return a subclass of :class:`str` with a ``read()`` method. It is still treated as a string instead of a file, because strings are handled first.
 
 .. rubric:: Changing the Default Encoding
@@ -239,16 +330,16 @@ In some rare cases the Python encoding names differ from the names supported by 
 Static Files
 --------------------------------------------------------------------------------
 
-You can directly return file objects, but :func:`static_file` is the recommended way to serve static files. It automatically guesses a mime-type, adds a ``Last-Modified`` header, restricts paths to a ``root`` directory for security reasons and generates appropriate error responses (401 on permission errors, 404 on missing files). It even supports the ``If-Modified-Since`` header and eventually generates a ``304 Not modified`` response. You can pass a custom mimetype to disable mimetype guessing.
+You can directly return file objects, but :func:`static_file` is the recommended way to serve static files. It automatically guesses a mime-type, adds a ``Last-Modified`` header, restricts paths to a ``root`` directory for security reasons and generates appropriate error responses (403 on permission errors, 404 on missing files). It even supports the ``If-Modified-Since`` header and eventually generates a ``304 Not Modified`` response. You can pass a custom MIME type to disable guessing.
 
 ::
 
     from bottle import static_file
-    @route('/images/:filename#.*\.png#')
+    @route('/images/<filename:re:.*\.png>')
     def send_image(filename):
         return static_file(filename, root='/path/to/image/files', mimetype='image/png')
-    
-    @route('/static/:filename')
+
+    @route('/static/<filename:path>')
     def send_static(filename):
         return static_file(filename, root='/path/to/static/files')
 
@@ -256,9 +347,9 @@ You can raise the return value of :func:`static_file` as an exception if you rea
 
 .. rubric:: Forced Download
 
-Most browsers try to open downloaded files if the MIME type is known and assigned to an application (e.g. PDF files). If this is not what you want, you can force a download-dialog and even suggest a filename to the user::
+Most browsers try to open downloaded files if the MIME type is known and assigned to an application (e.g. PDF files). If this is not what you want, you can force a download dialog and even suggest a filename to the user::
 
-    @route('/download/:filename')
+    @route('/download/<filename:path>')
     def download(filename):
         return static_file(filename, root='/path/to/static/files', download=filename)
 
@@ -292,7 +383,7 @@ You may provide a different HTTP status code as a second parameter.
 
 .. rubric:: Other Exceptions
 
-All exceptions other than :exc:`HTTPResponse` or :exc:`HTTPError` will result in a ``500 Internal Server Error`` response, so they won't crash your WSGI server. You can turn off this behaviour to handle exceptions in your middleware by setting ``bottle.app().catchall`` to ``False``.
+All exceptions other than :exc:`HTTPResponse` or :exc:`HTTPError` will result in a ``500 Internal Server Error`` response, so they won't crash your WSGI server. You can turn off this behavior to handle exceptions in your middleware by setting ``bottle.app().catchall`` to ``False``.
 
 
 .. _tutorial-response:
@@ -300,70 +391,87 @@ All exceptions other than :exc:`HTTPResponse` or :exc:`HTTPError` will result in
 The :class:`Response` Object
 --------------------------------------------------------------------------------
 
-Response meta-data such as the HTTP status code, response header and cookies are stored in an object called :data:`response` up to the point where they are transmitted to the browser. You can manipulate these meta-data directly or use the predefined helper methods to do so. The full API and feature list is described in the API section (see :class:`Response`), but the most common use cases and features are covered here, too.
+Response metadata such as the HTTP status code, response headers and cookies are stored in an object called :data:`response` up to the point where they are transmitted to the browser. You can manipulate these metadata directly or use the predefined helper methods to do so. The full API and feature list is described in the API section (see :class:`Response`), but the most common use cases and features are covered here, too.
 
 .. rubric:: Status Code
 
-The `HTTP status code <http_code>`_ controls the behaviour of the browser and defaults to ``200 OK``. In most scenarios you won't need to set the :attr:`Response.status` attribute manually, but use the :func:`abort` helper or return an :exc:`HTTPResponse` instance with the appropriate status code. Any integer is allowed but only the codes defined by the `HTTP specification <http_code>`_ will have an effect other than confusing the browser and breaking standards.
+The `HTTP status code <http_code>`_ controls the behavior of the browser and defaults to ``200 OK``. In most scenarios you won't need to set the :attr:`Response.status` attribute manually, but use the :func:`abort` helper or return an :exc:`HTTPResponse` instance with the appropriate status code. Any integer is allowed, but codes other than the ones defined by the `HTTP specification <http_code>`_ will only confuse the browser and break standards.
 
 .. rubric:: Response Header
 
-Add values to the :attr:`Response.headers` dictionary to add or change response headers. Note that the keys are case-insensitive.
+Response headers such as ``Cache-Control`` or ``Location`` are defined via :meth:`Response.set_header`. This method takes two parameters, a header name and a value. The name part is case-insensitive::
 
-::
-  
-  @route('/wiki/:page')
+  @route('/wiki/<page>')
   def wiki(page):
-      response.headers['Content-Language'] = 'en'
-      return get_wiki_page(page)
+      response.set_header('Content-Language', 'en')
+      ...
 
-.. _tutorial-signed-cookies:
+Most headers are unique, meaning that only one header per name is send to the client. Some special headers however are allowed to appear more than once in a response. To add an additional header, use :meth:`Response.add_header` instead of :meth:`Response.set_header`::
+
+    response.set_header('Set-Cookie', 'name=value')
+    response.add_header('Set-Cookie', 'name2=value2')
+
+Please note that this is just an example. If you want to work with cookies, read :ref:`ahead <tutorial-cookies>`.
+
+
+.. _tutorial-cookies:
 
 Cookies
 -------------------------------------------------------------------------------
 
-A cookie is a piece of text stored in the user's browser. You can access cookies via :meth:`Request.get_cookie` and set new cookies with the :meth:`Response.set_cookie` method::
+A cookie is a named piece of text stored in the user's browser profile. You can access previously defined cookies via :meth:`Request.get_cookie` and set new cookies with :meth:`Response.set_cookie`::
 
     @route('/hello')
-    def hello_again(self):
+    def hello_again():
         if request.get_cookie("visited"):
             return "Welcome back! Nice to see you again"
         else:
             response.set_cookie("visited", "yes")
             return "Hello there! Nice to meet you"
 
-But there are some gotchas:
+The :meth:`Response.set_cookie` method accepts a number of additional keyword arguments that control the cookies lifetime and behavior. Some of the most common settings are described here:
 
-* Cookies are limited to 4kb of text in most browsers.
-* Some users configure their browsers to not accept cookies at all. Most search-engines ignore cookies, too. Make sure that your application is still usable without cookies.
-* Cookies are stored at client side and not encrypted in any way. Whatever you store in a cookie, the user can read it. Worth than that, an attacker might be able to steal a user's cookies through `XSS <http://en.wikipedia.org/wiki/HTTP_cookie#Cookie_theft_and_session_hijacking>`_ vulnerabilities on your side. Some viruses are known to read the browser cookies, too. Do not store confidential information in cookies, ever. 
+* **max_age:**    Maximum age in seconds. (default: ``None``)
+* **expires:**    A datetime object or UNIX timestamp. (default: ``None``)
+* **domain:**     The domain that is allowed to read the cookie. (default: current domain)
+* **path:**       Limit the cookie to a given path (default: ``/``)
+* **secure:**     Limit the cookie to HTTPS connections (default: off).
+* **httponly:**   Prevent client-side javascript to read this cookie (default: off, requires Python 2.6 or newer).
+
+If neither `expires` nor `max_age` is set, the cookie expires at the end of the browser session or as soon as the browser window is closed. There are some other gotchas you should consider when using cookies:
+
+* Cookies are limited to 4 KB of text in most browsers.
+* Some users configure their browsers to not accept cookies at all. Most search engines ignore cookies too. Make sure that your application still works without cookies.
+* Cookies are stored at client side and are not encrypted in any way. Whatever you store in a cookie, the user can read it. Worse than that, an attacker might be able to steal a user's cookies through `XSS <http://en.wikipedia.org/wiki/HTTP_cookie#Cookie_theft_and_session_hijacking>`_ vulnerabilities on your side. Some viruses are known to read the browser cookies, too. Thus, never store confidential information in cookies.
 * Cookies are easily forged by malicious clients. Do not trust cookies.
+
+.. _tutorial-signed-cookies:
 
 .. rubric:: Signed Cookies
 
-As mentioned above, cookies are easily forged by malicious clients. Bottle can cryptographically sign your cookies to prevent this kind of manipulation. All you have to do is to provide a signature key whenever you read or set a cookie and keep that key a secret. As a result, :meth:`Request.get_cookie` will return ``None`` if the cookie is not signed or the signature keys don't match::
+As mentioned above, cookies are easily forged by malicious clients. Bottle can cryptographically sign your cookies to prevent this kind of manipulation. All you have to do is to provide a signature key via the `secret` keyword argument whenever you read or set a cookie and keep that key a secret. As a result, :meth:`Request.get_cookie` will return ``None`` if the cookie is not signed or the signature keys don't match::
 
     @route('/login')
-    def login():
+    def do_login():
         username = request.forms.get('username')
         password = request.forms.get('password')
-        if check_user_credentials(username, password):
+        if check_login(username, password):
             response.set_cookie("account", username, secret='some-secret-key')
-            return "Welcome %s! You are now logged in." % username
+            return template("<p>Welcome {{name}}! You are now logged in.</p>", name=username)
         else:
-            return "Login failed."
+            return "<p>Login failed.</p>"
 
     @route('/restricted')
-    def restricted_area(self):
+    def restricted_area():
         username = request.get_cookie("account", secret='some-secret-key')
         if username:
-            return "Hello %s. Welcome back." % username
+            return template("Hello {{name}}. Welcome back.", name=username)
         else:
             return "You are not logged in. Access denied."
 
-In addition, bottle automatically pickles and unpickles any data stored to signed cookies. This allows you to store any pickle-able object (not only strings) to cookies, as long as the pickled data does not exceed the 4kb limitation.
+In addition, Bottle automatically pickles and unpickles any data stored to signed cookies. This allows you to store any pickle-able object (not only strings) to cookies, as long as the pickled data does not exceed the 4 KB limit.
 
-.. warning:: Signed cookies are not encrypted (the client can still see the content) and not copy-protected (the client can restore an old cookie). The main intention is to make pickling and unpickling save, not to store secret information at client side.
+.. warning:: Signed cookies are not encrypted (the client can still see the content) and not copy-protected (the client can restore an old cookie). The main intention is to make pickling and unpickling safe and prevent manipulation, not to store secret information at client side.
 
 
 
@@ -375,99 +483,222 @@ In addition, bottle automatically pickles and unpickles any data stored to signe
 
 .. _tutorial-request:
 
-Accessing Request Data
+Request Data
 ==============================================================================
 
-Bottle provides access to HTTP related meta-data such as cookies, headers and POST form data through a global ``request`` object. This object always contains information about the *current* request, as long as it is accessed from within a callback function. This works even in multi-threaded environments where multiple requests are handled at the same time. For details on how a global object can be thread-safe, see :doc:`contextlocal`.
+Cookies, HTTP header, HTML ``<form>`` fields and other request data is available through the global :data:`request` object. This special object always refers to the *current* request, even in multi-threaded environments where multiple client connections are handled at the same time::
+
+  from bottle import request, route, template
+  
+  @route('/hello')
+  def hello():
+      name = request.cookies.username or 'Guest'
+      return template('Hello {{name}}', name=name)
+
+The :data:`request` object is a subclass of :class:`BaseRequest` and has a very rich API to access data. We only cover the most commonly used features here, but it should be enough to get started.
+
+
+
+Introducing :class:`FormsDict`
+--------------------------------------------------------------------------------
+
+Bottle uses a special type of dictionary to store form data and cookies. :class:`FormsDict` behaves like a normal dictionary, but has some additional features to make your life easier.
+
+**Attribute access**: All values in the dictionary are also accessible as attributes. These virtual attributes return unicode strings, even if the value is missing or unicode decoding fails. In that case, the string is empty, but still present::
+
+  name = request.cookies.name
+  
+  # is a shortcut for:
+  
+  name = request.cookies.getunicode('name') # encoding='utf-8' (default)
+
+  # which basically does this:
+
+  try:
+      name = request.cookies.get('name', '').decode('utf-8')
+  except UnicodeError:
+      name = u''
+
+**Multiple values per key:** :class:`FormsDict` is a subclass of :class:`MultiDict` and can store more than one value per key. The standard dictionary access methods will only return a single value, but the :meth:`~MultiDict.getall` method returns a (possibly empty) list of all values for a specific key::
+
+  for choice in request.forms.getall('multiple_choice'):
+      do_something(choice)
+
+**WTForms support:** Some libraries (e.g. `WTForms <http://wtforms.simplecodes.com/>`_) want all-unicode dictionaries as input. :meth:`FormsDict.decode` does that for you. It decodes all values and returns a copy of itself, while preserving multiple values per key and all the other features.
 
 .. note::
-  Bottle stores most of the parsed HTTP meta-data in :class:`MultiDict` instances. These behave like normal dictionaries but are able to store multiple values per key. The standard dictionary access methods will only return a single value. Use the :meth:`MultiDict.getall` method do receive a (possibly empty) list of all values for a specific key. The :class:`HeaderDict` class inherits from :class:`MultiDict` and  additionally uses case insensitive keys. 
 
-The full API and feature list is described in the API section (see :class:`Request`), but the most common use cases and features are covered here, too.
+    In **Python 2** all keys and values are byte-strings. If you need unicode, you can call :meth:`FormsDict.getunicode` or fetch values via attribute access. Both methods try to decode the string (default: utf8) and return an empty string if that fails. No need to catch :exc:`UnicodeError`::
 
-.. rubric:: HTTP Header
+      >>> request.query['city']
+      'G\xc3\xb6ttingen'  # A utf8 byte string
+      >>> request.query.city
+      u'Göttingen'        # The same string as unicode
 
-Header are stored in :attr:`Request.header`. The attribute is an instance of :class:`HeaderDict` which is basically a dictionary with case-insensitive keys::
+    In **Python 3** all strings are unicode, but HTTP is a byte-based wire protocol. The server has to decode the byte strings somehow before they are passed to the application. To be on the safe side, WSGI suggests ISO-8859-1 (aka latin1), a reversible single-byte codec that can be re-encoded with a different encoding later. Bottle does that for :meth:`FormsDict.getunicode` and attribute access, but not for the dict-access methods. These return the unchanged values as provided by the server implementation, which is probably not what you want.
 
-  from bottle import route, request
-  @route('/is_ajax')
-  def is_ajax():
-      if request.header.get('X-Requested-With') == 'XMLHttpRequest':
-          return 'This is an AJAX request'
-      else:
-          return 'This is a normal request'
+      >>> request.query['city']
+      'GÃ¶ttingen' # An utf8 string provisionally decoded as ISO-8859-1 by the server
+      >>> request.query.city
+      'Göttingen'  # The same string correctly re-encoded as utf8 by bottle
 
-.. rubric:: Cookies
+    If you need the whole dictionary with correctly decoded values (e.g. for WTForms), you can call :meth:`FormsDict.decode` to get a re-encoded copy.
 
-Cookies are stored in :attr:`Request.COOKIES` as a normal dictionary. The :meth:`Request.get_cookie` method allows access to :ref:`tutorial-signed-cookies` as described in a separate section. This example shows a simple cookie-based view counter::
+
+Cookies
+--------------------------------------------------------------------------------
+
+Cookies are small pieces of text stored in the clients browser and sent back to the server with each request. They are useful to keep some state around for more than one request (HTTP itself is stateless), but should not be used for security related stuff. They can be easily forged by the client.
+
+All cookies sent by the client are available through :attr:`BaseRequest.cookies` (a :class:`FormsDict`). This example shows a simple cookie-based view counter::
 
   from bottle import route, request, response
   @route('/counter')
   def counter():
-      count = int( request.COOKIES.get('counter', '0') )
+      count = int( request.cookies.get('counter', '0') )
       count += 1
       response.set_cookie('counter', str(count))
       return 'You visited this page %d times' % count
 
+The :meth:`BaseRequest.get_cookie` method is a different way do access cookies. It supports decoding :ref:`signed cookies <tutorial-signed-cookies>` as described in a separate section.
 
-.. rubric:: Query Strings
+HTTP Headers
+--------------------------------------------------------------------------------
 
-The query string (as in ``/forum?id=1&page=5``) is commonly used to transmit a small number of key/value pairs to the server. You can use the :attr:`Request.GET` dictionary to access these values and the :attr:`Request.query_string` attribute to get the whole string.
+All HTTP headers sent by the client (e.g. ``Referer``, ``Agent`` or ``Accept-Language``) are stored in a :class:`WSGIHeaderDict` and accessible through the :attr:`BaseRequest.headers` attribute. A :class:`WSGIHeaderDict` is basically a dictionary with case-insensitive keys::
+
+  from bottle import route, request
+  @route('/is_ajax')
+  def is_ajax():
+      if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+          return 'This is an AJAX request'
+      else:
+          return 'This is a normal request'
+
+
+Query Variables
+--------------------------------------------------------------------------------
+
+The query string (as in ``/forum?id=1&page=5``) is commonly used to transmit a small number of key/value pairs to the server. You can use the :attr:`BaseRequest.query` attribute (a :class:`FormsDict`) to access these values and the :attr:`BaseRequest.query_string` attribute to get the whole string.
 
 ::
 
-  from bottle import route, request, response
+  from bottle import route, request, response, template
   @route('/forum')
   def display_forum():
-      forum_id = request.GET.get('id')
-      page = request.GET.get('page', '1')
-      return 'Forum ID: %s (page %s)' % (forum_id, page)
+      forum_id = request.query.id
+      page = request.query.page or '1'
+      return template('Forum ID: {{id}} (page {{page}})', id=forum_id, page=page)
 
 
-.. rubric:: POST Form Data and File Uploads
+HTML `<form>` Handling
+----------------------
 
-The request body of POST and PUT requests may contain form data encoded in various formats. Use the :attr:`Request.forms` attribute (a :class:`MultiDict`) to access normal POST form fields. File uploads are stored separately in :attr:`Request.files` as :class:`cgi.FieldStorage` instances. The :attr:`Request.body` attribute holds a file object with the raw body data.
+Let us start from the beginning. In HTML, a typical ``<form>`` looks something like this:
 
-Here is an example for a simple file upload form:
+.. code-block:: html
+
+    <form action="/login" method="post">
+        Username: <input name="username" type="text" />
+        Password: <input name="password" type="password" />
+        <input value="Login" type="submit" />
+    </form>
+
+The ``action`` attribute specifies the URL that will receive the form data. ``method`` defines the HTTP method to use (``GET`` or ``POST``). With ``method="get"`` the form values are appended to the URL and available through :attr:`BaseRequest.query` as described above. This is considered insecure and has other limitations, so we use ``method="post"`` here. If in doubt, use ``POST`` forms.
+
+Form fields transmitted via ``POST`` are stored in :attr:`BaseRequest.forms` as a :class:`FormsDict`. The server side code may look like this::
+
+    from bottle import route, request
+
+    @route('/login')
+    def login():
+        return '''
+            <form action="/login" method="post">
+                Username: <input name="username" type="text" />
+                Password: <input name="password" type="password" />
+                <input value="Login" type="submit" />
+            </form>
+        '''
+
+    @route('/login', method='POST')
+    def do_login():
+        username = request.forms.get('username')
+        password = request.forms.get('password')
+        if check_login(username, password):
+            return "<p>Your login information was correct.</p>"
+        else:
+            return "<p>Login failed.</p>"
+
+There are several other attributes used to access form data. Some of them combine values from different sources for easier access. The following table should give you a decent overview.
+
+==============================   ===============   ================   ============
+Attribute                        GET Form fields   POST Form fields   File Uploads
+==============================   ===============   ================   ============
+:attr:`BaseRequest.query`        yes               no                 no
+:attr:`BaseRequest.forms`        no                yes                no
+:attr:`BaseRequest.files`        no                no                 yes
+:attr:`BaseRequest.params`       yes               yes                no
+:attr:`BaseRequest.GET`          yes               no                 no
+:attr:`BaseRequest.POST`         no                yes                yes
+==============================   ===============   ================   ============
+
+
+File uploads
+------------
+
+To support file uploads, we have to change the ``<form>`` tag a bit. First, we tell the browser to encode the form data in a different way by adding an ``enctype="multipart/form-data"`` attribute to the ``<form>`` tag. Then, we add ``<input type="file" />`` tags to allow the user to select a file. Here is an example:
 
 .. code-block:: html
 
     <form action="/upload" method="post" enctype="multipart/form-data">
-      <input type="text" name="name" />
-      <input type="file" name="data" />
+      Category:      <input type="text" name="category" />
+      Select a file: <input type="file" name="upload" />
+      <input type="submit" value="Start upload" />
     </form>
 
-::
+Bottle stores file uploads in :attr:`BaseRequest.files` as :class:`FileUpload` instances, along with some metadata about the upload. Let us assume you just want to save the file to disk::
 
-    from bottle import route, request
     @route('/upload', method='POST')
     def do_upload():
-        name = request.forms.get('name')
-        data = request.files.get('data')
-        if name and data:
-            raw = data.file.read() # This is dangerous for big files
-            filename = data.filename
-            return "Hello %s! You uploaded %s (%d bytes)." % (name, filename, len(raw))
-        return "You missed a field."
+        category   = request.forms.get('category')
+        upload     = request.files.get('upload')
+        name, ext = os.path.splitext(upload.filename)
+        if ext not in ('.png','.jpg','.jpeg'):
+            return 'File extension not allowed.'
+
+        save_path = get_save_path_for_category(category)
+        upload.save(save_path) # appends upload.filename automatically
+        return 'OK'
+
+:attr:`FileUpload.filename` contains the name of the file on the clients file system, but is cleaned up and normalized to prevent bugs caused by unsupported characters or path segments in the filename. If you need the unmodified name as sent by the client, have a look at :attr:`FileUpload.raw_filename`.
+
+The :attr:`FileUpload.save` method is highly recommended if you want to store the file to disk. It prevents some common errors (e.g. it does not overwrite existing files unless you tell it to) and stores the file in a memory efficient way. You can access the file object directly via :attr:`FileUpload.file`. Just be careful. 
 
 
-.. rubric:: WSGI environment
+JSON Content
+--------------------
 
-The :class:`Request` object stores the WSGI environment dictionary in :attr:`Request.environ` and allows dict-like access to its values. See the `WSGI specification`_ for details. 
+Some JavaScript or REST clients send ``application/json`` content to the server. The :attr:`BaseRequest.json` attribute contains the parsed data structure, if available.
 
-::
+
+The raw request body
+--------------------
+
+You can access the raw body data as a file-like object via :attr:`BaseRequest.body`. This is a :class:`BytesIO` buffer or a temporary file depending on the content length and :attr:`BaseRequest.MEMFILE_MAX` setting. In both cases the body is completely buffered before you can access the attribute. If you expect huge amounts of data and want to get direct unbuffered access to the stream, have a look at ``request['wsgi.input']``. 
+
+
+
+WSGI Environment
+--------------------------------------------------------------------------------
+
+Each :class:`BaseRequest` instance wraps a WSGI environment dictionary. The original is stored in :attr:`BaseRequest.environ`, but the request object itself behaves like a dictionary, too. Most of the interesting data is exposed through special methods or attributes, but if you want to access `WSGI environ variables <WSGI specification>`_ directly, you can do so::
 
   @route('/my_ip')
   def show_ip():
       ip = request.environ.get('REMOTE_ADDR')
       # or ip = request.get('REMOTE_ADDR')
       # or ip = request['REMOTE_ADDR']
-      return "Your IP is: %s" % ip
-
-
-
-
-
+      return template("Your IP is: {{ip}}", ip=ip)
 
 
 
@@ -483,7 +714,7 @@ Templates
 Bottle comes with a fast and powerful built-in template engine called :doc:`stpl`. To render a template you can use the :func:`template` function or the :func:`view` decorator. All you have to do is to provide the name of the template and the variables you want to pass to the template as keyword arguments. Here’s a simple example of how to render a template::
 
     @route('/hello')
-    @route('/hello/:name')
+    @route('/hello/<name>')
     def hello(name='World'):
         return template('hello_template', name=name)
 
@@ -492,7 +723,7 @@ This will load the template file ``hello_template.tpl`` and render it with the `
 The :func:`view` decorator allows you to return a dictionary with the template variables instead of calling :func:`template`::
 
     @route('/hello')
-    @route('/hello/:name')
+    @route('/hello/<name>')
     @view('hello_template')
     def hello(name='World'):
         return dict(name=name)
@@ -501,7 +732,7 @@ The :func:`view` decorator allows you to return a dictionary with the template v
 
 .. highlight:: html+django
 
-The template syntax is a very thin layer around the Python language. It's main purpose is to ensure correct indentation of blocks, so you can format your template without worrying about indentation. Follow the link for a full syntax description: :doc:`stpl`
+The template syntax is a very thin layer around the Python language. Its main purpose is to ensure correct indentation of blocks, so you can format your template without worrying about indentation. Follow the link for a full syntax description: :doc:`stpl`
 
 Here is an example template::
 
@@ -529,19 +760,20 @@ Plugins
 
 .. versionadded:: 0.9
 
-Bottles core features cover most of the common use-cases, but as a micro-framework it has its limits. This is where "Plugins" come into play. They add missing functionality to the framework, integrate third party libraries or just automate some repetitive work.
+Bottle's core features cover most common use-cases, but as a micro-framework it has its limits. This is where "Plugins" come into play. Plugins add missing functionality to the framework, integrate third party libraries, or just automate some repetitive work.
 
 We have a growing :doc:`/plugins/index` and most plugins are designed to be portable and re-usable across applications. The chances are high that your problem has already been solved and a ready-to-use plugin exists. If not, the :doc:`/plugindev` may help you.
 
-The effects and APIs of plugins are manifold and depend on the specific plugin. The 'sqlite' plugin for example detects callbacks that require a ``db`` keyword argument and creates a fresh database connection object every time the callback is called. This makes it very convenient to use a database::
+The effects and APIs of plugins are manifold and depend on the specific plugin. The ``SQLitePlugin`` plugin for example detects callbacks that require a ``db`` keyword argument and creates a fresh database connection object every time the callback is called. This makes it very convenient to use a database::
 
     from bottle import route, install, template
     from bottle_sqlite import SQLitePlugin
+
     install(SQLitePlugin(dbfile='/tmp/test.db'))
 
-    @route('/show/:post_id')
+    @route('/show/<post_id:int>')
     def show(db, post_id):
-        c = db.execute('SELECT title, content FROM posts WHERE id = ?', (int(post_id),))
+        c = db.execute('SELECT title, content FROM posts WHERE id = ?', (post_id,))
         row = c.fetchone()
         return template('show_post', title=row['title'], text=row['content'])
 
@@ -552,15 +784,15 @@ The effects and APIs of plugins are manifold and depend on the specific plugin. 
             completely. '''
         return template('contact')
 
-Other plugin may populate the thread-save :data:`local` object, change details of the :data:`request` object, filter the data returned by the callback or bypass the callback completely. An "auth" plugin for example could check for a valid session and return a login page instead of calling the original callback. What happens exactly depends on the plugin.
+Other plugin may populate the thread-safe :data:`local` object, change details of the :data:`request` object, filter the data returned by the callback or bypass the callback completely. An "auth" plugin for example could check for a valid session and return a login page instead of calling the original callback. What happens exactly depends on the plugin.
 
 
 Application-wide Installation
 --------------------------------------------------------------------------------
 
-Plugins can be installed application-wide or just to some specific routes that need additional functionality. Most plugins are save to be installed to all routes and are smart enough to not add overhead to callbacks that do not need their functionality.
+Plugins can be installed application-wide or just to some specific routes that need additional functionality. Most plugins can safely be installed to all routes and are smart enough to not add overhead to callbacks that do not need their functionality.
 
-Let us take the 'sqlite' plugin for example. It only affects route callbacks that need a database connection. Other routes are left alone. Because of this, we can install the plugin application-wide with no additional overhead.
+Let us take the ``SQLitePlugin`` plugin for example. It only affects route callbacks that need a database connection. Other routes are left alone. Because of this, we can install the plugin application-wide with no additional overhead.
 
 To install a plugin, just call :func:`install` with the plugin as first argument::
 
@@ -578,7 +810,7 @@ You can use a name, class or instance to :func:`uninstall` a previously installe
     install(sqlite_plugin)
 
     uninstall(sqlite_plugin) # uninstall a specific plugin
-    uninstall(SQLitePlugin)  # uninstall all plugins with that type
+    uninstall(SQLitePlugin)  # uninstall all plugins of that type
     uninstall('sqlite')      # uninstall all plugins with that name
     uninstall(True)          # uninstall all plugins at once
 
@@ -605,32 +837,57 @@ Blacklisting Plugins
 
 You may want to explicitly disable a plugin for a number of routes. The :func:`route` decorator has a ``skip`` parameter for this purpose::
 
-    sqlite_plugin = SQLitePlugin(dbfile='/tmp/test.db')
+    sqlite_plugin = SQLitePlugin(dbfile='/tmp/test1.db')
     install(sqlite_plugin)
 
-    @route('/open/:db', skip=[sqlite_plugin])
+    dbfile1 = '/tmp/test1.db'
+    dbfile2 = '/tmp/test2.db'
+
+    @route('/open/<db>', skip=[sqlite_plugin])
     def open_db(db):
         # The 'db' keyword argument is not touched by the plugin this time.
-        if db in ('test', 'test2'):
-            # The plugin handle can be used for runtime configuration, too.
-            sqlite_plugin.dbfile = '/tmp/%s.db' % db
-            return "Database File switched to: /tmp/%s.db" % db
-        abort(404, "No such database.")
+
+        # The plugin handle can be used for runtime configuration, too.
+        if db == 'test1':
+            sqlite_plugin.dbfile = dbfile1
+        elif db == 'test2':
+            sqlite_plugin.dbfile = dbfile2
+        else:
+            abort(404, "No such database.")
+
+        return "Database File switched to: " + sqlite_plugin.dbfile
 
 The ``skip`` parameter accepts a single value or a list of values. You can use a name, class or instance to identify the plugin that is to be skipped. Set ``skip=True`` to skip all plugins at once.
 
+Plugins and Sub-Applications
+--------------------------------------------------------------------------------
 
+Most plugins are specific to the application they were installed to. Consequently, they should not affect sub-applications mounted with :meth:`Bottle.mount`. Here is an example::
 
+    root = Bottle()
+    root.mount('/blog', apps.blog)
 
+    @root.route('/contact', template='contact')
+    def contact():
+        return {'email': 'contact@example.com'}
 
-.. _tutorial-debugging:
+    root.install(plugins.WTForms())
+
+Whenever you mount an application, Bottle creates a proxy-route on the main-application that forwards all requests to the sub-application. Plugins are disabled for this kind of proxy-route by default. As a result, our (fictional) `WTForms` plugin affects the ``/contact`` route, but does not affect the routes of the ``/blog`` sub-application.
+
+This behavior is intended as a sane default, but can be overridden. The following example re-activates all plugins for a specific proxy-route::
+
+    root.mount('/blog', apps.blog, skip=None)
+
+But there is a snag: The plugin sees the whole sub-application as a single route, namely the proxy-route mentioned above. In order to affect each individual route of the sub-application, you have to install the plugin to the mounted application explicitly.
+
 
 
 Development
 ================================================================================
 
-You learned the basics and want to write your own application? Here are
-some tips that might help you to be more productive.
+So you have learned the basics and want to write your own application? Here are
+some tips that might help you beeing more productive.
 
 .. _default-app:
 
@@ -643,35 +900,45 @@ Bottle maintains a global stack of :class:`Bottle` instances and uses the top of
     def hello():
         return 'Hello World'
 
-This is very convenient for small applications and saves you some typing, but also means that, as soon as your module is imported, routes are installed to the global application. To avoid this kind of import side-effects, Bottle offers a second, more explicit way to build applications::
+    run()
+
+This is very convenient for small applications and saves you some typing, but also means that, as soon as your module is imported, routes are installed to the global default application. To avoid this kind of import side-effects, Bottle offers a second, more explicit way to build applications::
 
     app = Bottle()
-    
+
     @app.route('/')
     def hello():
         return 'Hello World'
 
+    app.run()
+
 Separating the application object improves re-usability a lot, too. Other developers can safely import the ``app`` object from your module and use :meth:`Bottle.mount` to merge applications together.
 
-As an alternative, you can make use of the application stack to isolate your routes while still using the convenient shortcuts::
 
-    default_app.push()
+.. versionadded:: 0.13
 
-    @route('/')
-    def hello():
-        return 'Hello World'
+Starting with bottle-0.13 you can use :class:`Bottle` instances as context managers::
 
-    app = default_app.pop()
+    app = Bottle()
 
-Both :func:`app` and :func:`default_app` are instance of :class:`AppStack` and implement a stack-like API. You can push and pop applications from and to the stack as needed. This also helps if you want to import a third party module that does not offer a separate application object::
+    with app:
 
-    default_app.push()
+        # Our application object is now the default
+        # for all shortcut functions and decorators
 
-    import some.module
+        assert my_app is default_app()
 
-    app = default_app.pop()
+        @route('/')
+        def hello():
+            return 'Hello World'
+
+        # Also useful to capture routes defined in other modules
+        import some_package.more_routes
 
 
+
+
+.. _tutorial-debugging:
 
 
 Debug Mode
@@ -685,205 +952,104 @@ During early development, the debug mode can be very helpful.
 
     bottle.debug(True)
 
-In this mode, bottle is much more verbose and provides helpful debugging information whenever an error occurs. It also disables some optimisations that might get in your way and adds some checks that warn you about possible misconfiguration.
+In this mode, Bottle is much more verbose and provides helpful debugging information whenever an error occurs. It also disables some optimisations that might get in your way and adds some checks that warn you about possible misconfiguration.
 
 Here is an incomplete list of things that change in debug mode:
 
-* A stacktrace is added to the default error page.
-* Templates are not cached anymore.
+* The default error page shows a traceback.
+* Templates are not cached.
+* Plugins are applied immediately.
 
-Just make sure to not use the debug mode on a production server.
+Just make sure not to use the debug mode on a production server.
 
 Auto Reloading
 --------------------------------------------------------------------------------
 
-During development, you have to restart the server a lot to test your 
-recent changes. The auto reloader can do this for you. Every time you 
-edit a module file, the reloader restarts the server process and loads 
-the newest version of your code. 
+During development, you have to restart the server a lot to test your
+recent changes. The auto reloader can do this for you. Every time you
+edit a module file, the reloader restarts the server process and loads
+the newest version of your code.
 
 ::
 
     from bottle import run
     run(reloader=True)
 
-How it works: the main process will not start a server, but spawn a new 
-child process using the same command line arguments used to start the 
-main process. All module-level code is executed at least twice! Be 
+How it works: the main process will not start a server, but spawn a new
+child process using the same command line arguments used to start the
+main process. All module-level code is executed at least twice! Be
 careful.
 
-The child process will have ``os.environ['BOTTLE_CHILD']`` set to ``True`` 
-and start as a normal non-reloading app server. As soon as any of the 
-loaded modules changes, the child process is terminated and re-spawned by 
-the main process. Changes in template files will not trigger a reload. 
+The child process will have ``os.environ['BOTTLE_CHILD']`` set to ``True``
+and start as a normal non-reloading app server. As soon as any of the
+loaded modules changes, the child process is terminated and re-spawned by
+the main process. Changes in template files will not trigger a reload.
 Please use debug mode to deactivate template caching.
 
 The reloading depends on the ability to stop the child process. If you are
-running on Windows or any other operating system not supporting 
-``signal.SIGINT`` (which raises ``KeyboardInterrupt`` in Python), 
-``signal.SIGTERM`` is used to kill the child. Note that exit handlers and 
+running on Windows or any other operating system not supporting
+``signal.SIGINT`` (which raises ``KeyboardInterrupt`` in Python),
+``signal.SIGTERM`` is used to kill the child. Note that exit handlers and
 finally clauses, etc., are not executed after a ``SIGTERM``.
 
 
-.. _tutorial-deployment:
+Command Line Interface
+--------------------------------------------------------------------------------
+
+.. versionadded: 0.10
+
+Starting with version 0.10 you can use bottle as a command-line tool:
+
+.. code-block:: console
+
+    $ python -m bottle
+
+    Usage: bottle.py [options] package.module:app
+
+    Options:
+      -h, --help            show this help message and exit
+      --version             show version number.
+      -b ADDRESS, --bind=ADDRESS
+                            bind socket to ADDRESS.
+      -s SERVER, --server=SERVER
+                            use SERVER as backend.
+      -p PLUGIN, --plugin=PLUGIN
+                            install additional plugin/s.
+      --debug               start server in debug mode.
+      --reload              auto-reload on file changes.
+
+The `ADDRESS` field takes an IP address or an IP:PORT pair and defaults to ``localhost:8080``. The other parameters should be self-explanatory.
+
+Both plugins and applications are specified via import expressions. These consist of an import path (e.g. ``package.module``) and an expression to be evaluated in the namespace of that module, separated by a colon. See :func:`load` for details. Here are some examples:
+
+.. code-block:: console
+
+    # Grab the 'app' object from the 'myapp.controller' module and
+    # start a paste server on port 80 on all interfaces.
+    python -m bottle -server paste -bind 0.0.0.0:80 myapp.controller:app
+
+    # Start a self-reloading development server and serve the global
+    # default application. The routes are defined in 'test.py'
+    python -m bottle --debug --reload test
+
+    # Install a custom debug plugin with some parameters
+    python -m bottle --debug --reload --plugin 'utils:DebugPlugin(exc=True)'' test
+
+    # Serve an application that is created with 'myapp.controller.make_app()'
+    # on demand.
+    python -m bottle 'myapp.controller:make_app()''
+
 
 Deployment
 ================================================================================
 
 Bottle runs on the built-in `wsgiref WSGIServer <http://docs.python.org/library/wsgiref.html#module-wsgiref.simple_server>`_  by default. This non-threading HTTP server is perfectly fine for development and early production, but may become a performance bottleneck when server load increases.
 
-There are three ways to eliminate this bottleneck:
+The easiest way to increase performance is to install a multi-threaded server library like paste_ or cherrypy_ and tell Bottle to use that instead of the single-threaded server::
 
-* Use a multi-threaded or asynchronous HTTP server.
-* Spread the load between multiple bottle instances.
-* Do both.
+    bottle.run(server='paste')
 
-
-
-Multi-Threaded Server
---------------------------------------------------------------------------------
-
-.. _flup: http://trac.saddi.com/flup
-.. _gae: http://code.google.com/appengine/docs/python/overview.html
-.. _wsgiref: http://docs.python.org/library/wsgiref.html
-.. _cherrypy: http://www.cherrypy.org/
-.. _paste: http://pythonpaste.org/
-.. _rocket: http://pypi.python.org/pypi/rocket
-.. _gunicorn: http://pypi.python.org/pypi/gunicorn
-.. _fapws3: http://www.fapws.org/
-.. _tornado: http://www.tornadoweb.org/
-.. _twisted: http://twistedmatrix.com/
-.. _diesel: http://dieselweb.org/
-.. _meinheld: http://pypi.python.org/pypi/meinheld
-.. _bjoern: http://pypi.python.org/pypi/bjoern
-
-The easiest way to increase performance is to install a multi-threaded or asynchronous WSGI server like paste_ or cherrypy_ and tell bottle to start it instead of the default single-threaded one::
-
-    bottle.run(server='paste') # Example
-
-Bottle ships with a lot of ready-to-use adapters for the most common WSGI servers and automates the setup process. Here is an incomplete list:
-
-========  ============  ======================================================
-Name      Homepage      Description
-========  ============  ======================================================
-cgi                     Run as CGI script
-flup      flup_         Run as Fast CGI process
-gae       gae_          Helper for Google App Engine deployments
-wsgiref   wsgiref_      Single-threaded default server
-cherrypy  cherrypy_     Multi-threaded and very stable
-paste     paste_        Multi-threaded, stable, tried and tested
-rocket    rocket_       Multi-threaded
-gunicorn  gunicorn_     Pre-forked, partly written in C
-fapws3    fapws3_       Asynchronous, written in C
-tornado   tornado_      Asynchronous, powers some parts of Facebook
-twisted   twisted_      Asynchronous, well tested
-diesel    diesel_       Asynchronous, based on greenlet
-meinheld  meinheld_     Asynchronous, partly written in C
-bjoern    bjoern_       Asynchronous, very fast and written in C
-auto                    Automatically selects an available server adapter
-========  ============  ======================================================
-
-The full list is available through :data:`server_names`.
-
-If there is no adapter for your favorite server or if you need more control over the server setup, you may want to start the server manually. Refer to the server documentation on how to mount WSGI applications. Here is an example for paste_::
-
-    from paste import httpserver
-    httpserver.serve(bottle.default_app(), host='0.0.0.0', port=80)
-
-
-Multiple Server Processes
---------------------------------------------------------------------------------
-
-A single Python process can only utilise one CPU at a time, even if 
-there are more CPU cores available. The trick is to balance the load 
-between multiple independent Python processes to utilize all of your 
-CPU cores.
-
-Instead of a single Bottle application server, you start one instance 
-of your server for each CPU core available using different local port 
-(localhost:8080, 8081, 8082, ...). Then a high performance load 
-balancer acts as a reverse proxy and forwards each new requests to 
-a random Bottle processes, spreading the load between all available 
-back end server instances. This way you can use all of your CPU cores and 
-even spread out the load between different physical servers.
-
-One of the fastest load balancers available is Pound_ but most common web servers have a proxy-module that can do the work just fine.
-
-
-Apache mod_wsgi
---------------------------------------------------------------------------------
-
-Instead of running your own HTTP server from within Bottle, you can 
-attach Bottle applications to an `Apache server`_ using 
-mod_wsgi_ and Bottle's WSGI interface.
-
-All you need is an ``app.wsgi`` file that provides an 
-``application`` object. This object is used by mod_wsgi to start your 
-application and should be a WSGI-compatible Python callable.
-
-File ``/var/www/yourapp/app.wsgi``::
-
-    # Change working directory so relative paths (and template lookup) work again
-    os.chdir(os.path.dirname(__file__))
-    
-    import bottle
-    # ... build or import your bottle application here ...
-    # Do NOT use bottle.run() with mod_wsgi
-    application = bottle.default_app()
-
-The Apache configuration may look like this::
-
-    <VirtualHost *>
-        ServerName example.com
-        
-        WSGIDaemonProcess yourapp user=www-data group=www-data processes=1 threads=5
-        WSGIScriptAlias / /var/www/yourapp/app.wsgi
-        
-        <Directory /var/www/yourapp>
-            WSGIProcessGroup yourapp
-            WSGIApplicationGroup %{GLOBAL}
-            Order deny,allow
-            Allow from all
-        </Directory>
-    </VirtualHost>
-
-
-
-Google AppEngine
---------------------------------------------------------------------------------
-
-.. versionadded:: 0.9
-
-The ``gae`` adapter completely automates the Google App Engine deployment. It even ensures that a ``main()`` function is present in your ``__main__`` module to enable `App Caching <http://code.google.com/appengine/docs/python/runtime.html#App_Caching>`_ (which drastically improves performance)::
-
-    import bottle
-    # ... build or import your bottle application here ...
-    bottle.run(server='gae')
-
-It is always a good idea to let GAE serve static files directly. Here is example ``app.yaml``::
-
-    application: myapp
-    version: 1
-    runtime: python
-    api_version: 1
-
-    handlers:
-    - url: /static
-      static_dir: static
-
-    - url: /.*
-      script: myapp.py
-
-
-Good old CGI
---------------------------------------------------------------------------------
-
-CGI is slow as hell, but it works::
-
-    import bottle
-    # ... build or import your bottle application here ...
-    bottle.run(server=bottle.CGIServer)
-
+This, and many other deployment options are described in a separate article: :doc:`deployment`
 
 
 
@@ -897,7 +1063,7 @@ Glossary
 
    callback
       Programmer code that is to be called when some external action happens.
-      In the context of web frameworks, the mapping between URL paths and 
+      In the context of web frameworks, the mapping between URL paths and
       application code is often achieved by specifying a callback function
       for each URL.
 

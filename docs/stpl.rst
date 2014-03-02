@@ -32,9 +32,10 @@ Python is a very powerful language but its whitespace-aware syntax makes it diff
 
    The :class:`SimpleTemplate` syntax compiles directly to python bytecode and is executed on each :meth:`SimpleTemplate.render` call. Do not render untrusted templates! They may contain and execute harmful python code.
 
-.. rubric:: Inline Statements
+Inline Expressions
+------------------
 
-You already learned the use of the ``{{...}}`` statement from the "Hello World!" example above, but there is more: any python statement is allowed within the curly brackets as long as it returns a string or something that has a string representation::
+You already learned the use of the ``{{...}}`` syntax from the "Hello World!" example above, but there is more: any python expression is allowed within the curly brackets as long as it evaluates to a string or something that has a string representation::
 
   >>> template('Hello {{name}}!', name='World')
   u'Hello World!'
@@ -43,134 +44,149 @@ You already learned the use of the ``{{...}}`` statement from the "Hello World!"
   >>> template('Hello {{name.title() if name else "stranger"}}!', name='mArC')
   u'Hello Marc!'
 
-The contained python statement is executed at render-time and has access to all keyword arguments passed to the :meth:`SimpleTemplate.render` method. HTML special characters are escaped automatically to prevent `XSS <http://en.wikipedia.org/wiki/Cross-Site_Scripting>`_ attacks. You can start the statement with an exclamation mark to disable escaping for that statement::
+The contained python expression is executed at render-time and has access to all keyword arguments passed to the :meth:`SimpleTemplate.render` method. HTML special characters are escaped automatically to prevent `XSS <http://en.wikipedia.org/wiki/Cross-Site_Scripting>`_ attacks. You can start the expression with an exclamation mark to disable escaping for that expression::
 
   >>> template('Hello {{name}}!', name='<b>World</b>')
   u'Hello &lt;b&gt;World&lt;/b&gt;!'
   >>> template('Hello {{!name}}!', name='<b>World</b>')
   u'Hello <b>World</b>!'
 
+Embedded python code
+--------------------
+
 .. highlight:: html+django
 
-.. rubric:: Embedded python code
+The template engine allows you to embed lines or blocks of python code within your template. Code lines start with ``%`` and code blocks are surrounded by ``<%`` and ``%>`` tokens::
 
-The ``%`` character marks a line of python code. The only difference between this and real python code is that you have to explicitly close blocks with an ``%end`` statement. In return you can align the code with the surrounding template and don't have to worry about correct indentation of blocks. The *SimpleTemplate* parser handles that for you. Lines *not* starting with a ``%`` are rendered as text as usual::
+  % name = "Bob"  # a line of python code
+  <p>Some plain text in between</p>
+  <%
+    # A block of python code
+    name = name.title().strip()
+  %>
+  <p>More plain text</p>
 
-  %if name:
-    Hi <b>{{name}}</b>
-  %else:
-    <i>Hello stranger</i>
-  %end
+Embedded python code follows regular python syntax, but with two additional syntax rules:
 
-The ``%`` character is only recognised if it is the first non-whitespace character in a line. To escape a leading ``%`` you can add a second one. ``%%`` is replaced by a single ``%`` in the resulting template::
+* **Indentation is ignored.** You can put as much whitespace in front of statements as you want. This allows you to align your code with the surrounding markup and can greatly improve readability.
+* Blocks that are normally indented now have to be closed explicitly with an ``end`` keyword.
 
-  This line contains a % but no python code.
-  %% This text-line starts with '%'
-  %%% This text-line starts with '%%'
+::
 
-.. rubric:: Suppressing line breaks
+  <ul>
+    % for item in basket:
+      <li>{{item}}</li>
+    % end
+  </ul>
 
-You can suppress the line break in front of a code-line by adding a double backslash at the end of the line::
+Both the ``%`` and the ``<%`` tokens are only recognized if they are the first non-whitespace characters in a line. You don't have to escape them if they appear mid-text in your template markup. Only if a line of text starts with one of these tokens, you have to escape it with a backslash. In the rare case where the backslash + token combination appears in your markup at the beginning of a line, you can always help yourself with a string literal in an inline expression:: 
 
-  <span>\\
-  %if True:
-  nobreak\\
-  %end
-  </span>
+  This line contains % and <% but no python code.
+  \% This text-line starts with the '%' token.
+  \<% Another line that starts with a token but is rendered as text.
+  {{'\\%'}} this line starts with an escaped token.
 
-This template produces the following output::
+If you find yourself to escape a lot, consider using :ref:`custom tokens <stpl-custom-tokens>`.
 
-  <span>nobreak</span>
+Whitespace Control
+-----------------------
 
-.. rubric:: The ``%include`` Statement
+Code blocks and code lines always span the whole line. Whitespace in front of after a code segment is stripped away. You won't see empty lines or dangling whitespace in your template because of embedded code::
 
-You can include other templates using the ``%include sub_template [kwargs]`` statement. The ``sub_template`` parameter specifies the name or path of the template to be included. The rest of the line is interpreted as a comma-separated list of ``key=statement`` pairs similar to keyword arguments in function calls. They are passed to the sub-template analogous to a :meth:`SimpleTemplate.render` call. The ``**kwargs`` syntax for passing a dict is allowed too::
-
-  %include header_template title='Hello World'
-  <p>Hello World</p>
-  %include foother_template
-
-.. rubric:: The ``%rebase`` Statement
-
-The ``%rebase base_template [kwargs]`` statement causes ``base_template`` to be rendered instead of the original template. The base-template then includes the original template using an empty ``%include`` statement and has access to all variables specified by ``kwargs``. This way it is possible to wrap a template with another template or to simulate the inheritance feature found in some other template engines.
-
-Let's say you have a content template and want to wrap it with a common HTML layout frame. Instead of including several header and footer templates, you can use a single base-template to render the layout frame.
-
-Base-template named ``layout.tpl``::
-
-  <html>
-  <head>
-    <title>{{title or 'No title'}}</title>
-  </head>
-  <body>
-    %include
-  </body>
-  </html>
-
-Main-template named ``content.tpl``::
-
-  This is the page content: {{content}}
-  %rebase layout title='Content Title'
-
-Now you can render ``content.tpl``:
-
-.. code-block:: python
-
-  >>> print template('content', content='Hello World!')
-
-.. code-block:: html
-
-  <html>
-  <head>
-    <title>Content Title</title>
-  </head>
-  <body>
-    This is the page content: Hello World!
-  </body>
-  </html>
-
-A more complex scenario involves chained rebases and multiple content blocks. The ``block_content.tpl`` template defines two functions and passes them to a ``columns.tpl`` base template::
-
-  %def leftblock():
-    Left block content.
-  %end
-  %def rightblock():
-    Right block content.
-  %end
-  %rebase columns left=leftblock, right=rightblock, title=title
-
-The ``columns.tpl`` base-template uses the two callables to render the content of the left and right column. It then wraps itself with the ``layout.tpl`` template defined earlier::
-
-  %rebase layout title=title
-  <div style="width: 50%; float:left">
-    %leftblock()
-  </div>
-  <div style="width: 50%; float:right">
-    %rightblock()
+  <div>
+   % if True:
+    <span>content</span>
+   % end
   </div>
 
-Lets see how ``block_content.tpl`` renders:
+This snippet renders to clean and compact html::
 
-.. code-block:: python
-
-  >>> print template('block_content', title='Hello World!')
-
-.. code-block:: html
-
-  <html>
-  <head>
-    <title>Hello World</title>
-  </head>
-  <body>
-  <div style="width: 50%; float:left">
-    Left block content.
+  <div>
+    <span>content</span>
   </div>
-  <div style="width: 50%; float:right">
-    Right block content.
-  </div>
-  </body>
-  </html>
 
+But embedding code still requires you to start a new line, which may not what you want to see in your rendered template. To skip the newline in front of a code segment, end the text line with a double-backslash::
+
+  <div>\\
+   %if True:
+  <span>content</span>\\
+   %end
+  </div>
+
+THis time the rendered template looks like this::
+
+  <div><span>content</span></div>
+
+This only works directly in front of code segments. In all other places you can control the whitespace yourself and don't need any special syntax.
+
+Template Functions
+==================
+
+Each template is preloaded with a bunch of functions that help with the most common use cases. These functions are always available. You don't have to import or provide them yourself. For everything not covered here there are probably good python libraries available. Remember that you can ``import`` anything you want within your templates. They are python programs after all.
+
+.. currentmodule:: stpl
+
+.. versionchanged:: 0.12
+   Prior to this release, :func:`include` and :func:`rebase` were sytnax keywords, not functions.
+
+.. function:: include(sub_template, **variables)
+
+  Render a sub-template with the specified variables and insert the resulting text into the current template. The function returns a dictionary containing the local variables passed to or defined within the sub-template::
+
+    % include('header.tpl', title='Page Title')
+    Page Content
+    % include('foother.tpl')
+
+.. function:: rebase(name, **variables)
+
+  Mark the current template to be later included into a different template. After the current template is rendered, its resulting text is stored in a variable named ``base`` and passed to the base-template, which is then rendered. This can be used to `wrap` a template with surrounding text, or simulate the inheritance feature found in other template engines::
+
+    % rebase('base.tpl', title='Page Title')
+    <p>Page Content ...</p>
+
+  This can be combined with the following ``base.tpl``::
+
+    <html>
+    <head>
+      <title>{{title or 'No title'}}</title>
+    </head>
+    <body>
+      {{base}}
+    </body>
+    </html>
+
+
+Accessing undefined variables in a template raises :exc:`NameError` and
+stops rendering immediately. This is standard python behavior and nothing new,
+but vanilla python lacks an easy way to check the availability of a variable.
+This quickly gets annoying if you want to support flexible inputs or use the
+same template in different situations. These functions may help:
+
+.. function:: defined(name)
+
+    Return True if the variable is defined in the current template namespace,
+    False otherwise.
+
+.. function:: get(name, default=None)
+
+    Return the variable, or a default value.
+
+.. function:: setdefault(name, default)
+
+    If the variable is not defined, create it with the given default value.
+    Return the variable.
+
+Here is an example that uses all three functions to implement optional template
+variables in different ways::
+
+    % setdefault('text', 'No Text')
+    <h1>{{get('title', 'No Title')}}</h1>
+    <p> {{ text }} </p>
+    % if defined('author'):
+      <p>By {{ author }}</p>
+    % end
+
+.. currentmodule:: bottle
 
 
 :class:`SimpleTemplate` API
@@ -179,10 +195,3 @@ Lets see how ``block_content.tpl`` renders:
 .. autoclass:: SimpleTemplate
    :members:
 
-Known bugs
-==============================
-
-Some syntax constructions allowed in python are problematic within a template. The following syntaxes won't work with SimpleTemplate:
-
-  * Multi-line statements must end with a backslash (``\``) and a comment, if present, must not contain any additional ``#`` characters.
-  * Multi-line strings are not supported yet.

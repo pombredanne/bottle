@@ -2,8 +2,8 @@
 *.pyo
 *.db
 *.log
+*.mo
 ._*
-.*
 *.*~
 dist/
 build/

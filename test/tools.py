@@ -1,36 +1,52 @@
 # -*- coding: utf-8 -*-
 import bottle
-import threading
-import urllib
-import urllib2
 import sys
-import time
 import unittest
 import wsgiref
-import wsgiref.simple_server
 import wsgiref.util
 import wsgiref.validate
 
-from StringIO import StringIO
-try:
-    from io import BytesIO
-except:
-    BytesIO = None
-    pass
 import mimetypes
 import uuid
 
-def tob(data):
-    ''' Transforms bytes or unicode into bytes. '''
-    return data.encode('utf8') if isinstance(data, unicode) else data
+from bottle import tob, tonat, BytesIO, py3k, unicode
+
+def warn(msg):
+    sys.stderr.write('WARNING: %s\n' % msg.strip())
 
 def tobs(data):
     ''' Transforms bytes or unicode into a byte stream. '''
-    return BytesIO(tob(data)) if BytesIO else StringIO(tob(data))
+    return BytesIO(tob(data))
+
+def api(introduced, deprecated=None, removed=None):
+    current    = tuple(map(int, bottle.__version__.split('-')[0].split('.')))
+    introduced = tuple(map(int, introduced.split('.')))
+    deprecated = tuple(map(int, deprecated.split('.'))) if deprecated else (99,99)
+    removed    = tuple(map(int, removed.split('.')))    if removed    else (99,100)
+    assert introduced < deprecated < removed
+
+    def decorator(func):
+        if   current < introduced:
+            return None
+        elif current < deprecated:
+            return func
+        elif current < removed:
+            func.__doc__ = '(deprecated) ' + (func.__doc__ or '')
+            return func
+        else:
+            return None
+    return decorator
+
+
+def wsgistr(s):
+    if py3k:
+        return s.encode('utf8').decode('latin1')
+    else:
+        return s
 
 class ServerTestBase(unittest.TestCase):
     def setUp(self):
-        ''' Create a new Bottle app set it as default_app and register it to urllib2 '''
+        ''' Create a new Bottle app set it as default_app '''
         self.port = 8080
         self.host = 'localhost'
         self.app = bottle.app.push()
@@ -49,9 +65,9 @@ class ServerTestBase(unittest.TestCase):
                     result['header'][name] = value
         env = env if env else {}
         wsgiref.util.setup_testing_defaults(env)
-        env['REQUEST_METHOD'] = method.upper().strip()
-        env['PATH_INFO'] = path
-        env['QUERY_STRING'] = ''
+        env['REQUEST_METHOD'] = wsgistr(method.upper().strip())
+        env['PATH_INFO'] = wsgistr(path)
+        env['QUERY_STRING'] = wsgistr('')
         if post:
             env['REQUEST_METHOD'] = 'POST'
             env['CONTENT_LENGTH'] = str(len(tob(post)))
@@ -67,7 +83,7 @@ class ServerTestBase(unittest.TestCase):
             response.close()
             del response
         return result
-        
+
     def postmultipart(self, path, fields, files):
         env = multipart_environ(fields, files)
         return self.urlopen(path, method='POST', env=env)
@@ -97,7 +113,7 @@ class ServerTestBase(unittest.TestCase):
         err = bottle.request.environ['wsgi.errors'].errors.read()
         if search not in err:
             self.fail('The search pattern "%s" is not included in wsgi.error: %s' % (search, err))
-        
+
 def multipart_environ(fields, files):
     boundary = str(uuid.uuid1())
     env = {'REQUEST_METHOD':'POST',
@@ -110,14 +126,14 @@ def multipart_environ(fields, files):
         body += 'Content-Disposition: form-data; name="%s"\n\n' % name
         body += value + '\n'
     for name, filename, content in files:
-        mimetype = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
+        mimetype = str(mimetypes.guess_type(filename)[0]) or 'application/octet-stream'
         body += boundary + '\n'
         body += 'Content-Disposition: file; name="%s"; filename="%s"\n' % \
              (name, filename)
         body += 'Content-Type: %s\n\n' % mimetype
         body += content + '\n'
     body += boundary + '--\n'
-    if hasattr(body, 'encode'):
+    if isinstance(body, unicode):
         body = body.encode('utf8')
     env['CONTENT_LENGTH'] = str(len(body))
     env['wsgi.input'].write(body)

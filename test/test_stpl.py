@@ -1,164 +1,172 @@
 # -*- coding: utf-8 -*-
 import unittest
-from bottle import SimpleTemplate, TemplateError, view, template
+from bottle import SimpleTemplate, TemplateError, view, template, touni, tob, html_quote
+import re
+import traceback
 
 class TestSimpleTemplate(unittest.TestCase):
+    def assertRenders(self, tpl, to, *args, **vars):
+        if isinstance(tpl, str):
+            tpl = SimpleTemplate(tpl)
+        self.assertEqual(touni(to), tpl.render(*args, **vars))
+
     def test_string(self):
         """ Templates: Parse string"""
-        t = SimpleTemplate('start {{var}} end').render(var='var')
-        self.assertEqual(u'start var end', t)
-        t = SimpleTemplate('start {{self}} end').render({'self':'var'}) # "self" cannot be used as a kwarg
-        self.assertEqual(u'start var end', t)
+        self.assertRenders('start {{var}} end', 'start var end', var='var')
+
+    def test_self_as_variable_name(self):
+        self.assertRenders('start {{self}} end', 'start var end', {'self':'var'})
 
     def test_file(self):
-        """ Templates: Parse file"""
-        t = SimpleTemplate(name='./views/stpl_simple.tpl').render(var='var')
-        self.assertEqual(u'start var end\n', t)
+        t = SimpleTemplate(name='./views/stpl_simple.tpl')
+        self.assertRenders(t, 'start var end\n', var='var')
 
     def test_name(self):
-        """ Templates: Lookup by name """
-        t = SimpleTemplate(name='stpl_simple', lookup=['./views/']).render(var='var')
-        self.assertEqual(u'start var end\n', t)
+        t = SimpleTemplate(name='stpl_simple', lookup=['./views/'])
+        self.assertRenders(t, 'start var end\n', var='var')
 
     def test_unicode(self):
-        """ Templates: Unicode variables """
-        t = SimpleTemplate('start {{var}} end').render(var=u'äöü')
-        self.assertEqual(u'start äöü end', t)
+        self.assertRenders('start {{var}} end', 'start äöü end', var=touni('äöü'))
+        self.assertRenders('start {{var}} end', 'start äöü end', var=tob('äöü'))
 
     def test_unicode_code(self):
         """ Templates: utf8 code in file"""
-        t = SimpleTemplate(name='./views/stpl_unicode.tpl').render(var='äöü')
-        self.assertEqual(u'start ñç äöü end\n', t)
+        t = SimpleTemplate(name='./views/stpl_unicode.tpl')
+        self.assertRenders(t, 'start ñç äöü end\n', var=touni('äöü'))
 
     def test_import(self):
         """ Templates: import statement"""
         t = '%from base64 import b64encode\nstart {{b64encode(var.encode("ascii") if hasattr(var, "encode") else var)}} end'
-        t = SimpleTemplate(t).render(var='var')
-        self.assertEqual(u'start dmFy end', t)
+        self.assertRenders(t, 'start dmFy end', var='var')
 
     def test_data(self):
         """ Templates: Data representation """
         t = SimpleTemplate('<{{var}}>')
-        self.assertEqual(u'<True>', t.render(var=True))
-        self.assertEqual(u'<False>', t.render(var=False))
-        self.assertEqual(u'<None>', t.render(var=None))
-        self.assertEqual(u'<0>', t.render(var=0))
-        self.assertEqual(u'<5>', t.render(var=5))
-        self.assertEqual(u'<b>', t.render(var='b'))
-        self.assertEqual(u'<1.0>', t.render(var=1.0))
-        self.assertEqual(u'<[1, 2]>', t.render(var=[1,2]))
+        self.assertRenders('<{{var}}>', '<True>', var=True)
+        self.assertRenders('<{{var}}>', '<False>', var=False)
+        self.assertRenders('<{{var}}>', '<>', var=None)
+        self.assertRenders('<{{var}}>', '<0>', var=0)
+        self.assertRenders('<{{var}}>', '<5>', var=5)
+        self.assertRenders('<{{var}}>', '<b>', var=tob('b'))
+        self.assertRenders('<{{var}}>', '<1.0>', var=1.0)
+        self.assertRenders('<{{var}}>', '<[1, 2]>', var=[1,2])
+
+    def test_htmlutils_quote(self):
+        self.assertEquals('"&lt;&#039;&#13;&#10;&#9;&quot;\\&gt;"', html_quote('<\'\r\n\t"\\>'));
 
     def test_escape(self):
-        t = SimpleTemplate('<{{var}}>')
-        self.assertEqual(u'<b>', t.render(var='b'))
-        self.assertEqual(u'<&lt;&amp;&gt;>', t.render(var='<&>'))
+        self.assertRenders('<{{var}}>', '<b>', var='b')
+        self.assertRenders('<{{var}}>', '<&lt;&amp;&gt;>',var='<&>')
 
     def test_noescape(self):
-        t = SimpleTemplate('<{{!var}}>')
-        self.assertEqual(u'<b>', t.render(var='b'))
-        self.assertEqual(u'<<&>>', t.render(var='<&>'))
+        self.assertRenders('<{{!var}}>', '<b>',   var='b')
+        self.assertRenders('<{{!var}}>', '<<&>>', var='<&>')
 
     def test_noescape_setting(self):
         t = SimpleTemplate('<{{var}}>', noescape=True)
-        self.assertEqual(u'<b>', t.render(var='b'))
-        self.assertEqual(u'<<&>>', t.render(var='<&>'))
+        self.assertRenders(t, '<b>', var='b')
+        self.assertRenders(t, '<<&>>', var='<&>')
         t = SimpleTemplate('<{{!var}}>', noescape=True)
-        self.assertEqual(u'<b>', t.render(var='b'))
-        self.assertEqual(u'<&lt;&amp;&gt;>', t.render(var='<&>'))
+        self.assertRenders(t, '<b>', var='b')
+        self.assertRenders(t, '<&lt;&amp;&gt;>', var='<&>')
 
     def test_blocks(self):
         """ Templates: Code blocks and loops """
-        t = SimpleTemplate("start\n%for i in l:\n{{i}} \n%end\nend")
-        self.assertEqual(u'start\n1 \n2 \n3 \nend', t.render(l=[1,2,3]))
-        self.assertEqual(u'start\nend', t.render(l=[]))
-        t = SimpleTemplate("start\n%if i:\n{{i}} \n%end\nend")
-        self.assertEqual(u'start\nTrue \nend', t.render(i=True))
-        self.assertEqual(u'start\nend', t.render(i=False))
+        t = "start\n%for i in l:\n{{i}} \n%end\nend"
+        self.assertRenders(t, 'start\n1 \n2 \n3 \nend', l=[1,2,3])
+        self.assertRenders(t, 'start\nend', l=[])
+        t = "start\n%if i:\n{{i}} \n%end\nend"
+        self.assertRenders(t, 'start\nTrue \nend', i=True)
+        self.assertRenders(t, 'start\nend', i=False)
 
     def test_elsebug(self):
         ''' Whirespace between block keyword and colon is allowed '''
-        t = SimpleTemplate("%if 1:\nyes\n%else:\nno\n%end\n")
-        self.assertEqual(u"yes\n", t.render())
-        t = SimpleTemplate("%if 1:\nyes\n%else     :\nno\n%end\n")
-        self.assertEqual(u"yes\n", t.render())
+        self.assertRenders("%if 1:\nyes\n%else:\nno\n%end\n", "yes\n")
+        self.assertRenders("%if 1:\nyes\n%else     :\nno\n%end\n", "yes\n")
 
     def test_commentbug(self):
         ''' A "#" sign within an string is not a comment '''
-        t = SimpleTemplate("%if '#':\nyes\n%end\n")
-        self.assertEqual(u"yes\n", t.render())
+        self.assertRenders("%if '#':\nyes\n%end\n", "yes\n")
 
     def test_multiline(self):
         ''' Block statements with non-terminating newlines '''
-        t = SimpleTemplate("%if 1\\\n%and 1:\nyes\n%end\n")
-        self.assertEqual(u"yes\n", t.render())
+        self.assertRenders("%if 1\\\n%and 1:\nyes\n%end\n", "yes\n")
 
     def test_newline_in_parameterlist(self):
         ''' Block statements with non-terminating newlines in list '''
-        t = SimpleTemplate("%a=[1,\n%2]\n{{len(a)}}")
-        self.assertEqual(u"2", t.render())
+        self.assertRenders("%a=[1,\n%2]\n{{len(a)}}", "2")
 
     def test_dedentbug(self):
         ''' One-Line dednet blocks should not change indention '''
-        t = SimpleTemplate('%if x: a="if"\n%else: a="else"\n{{a}}')
-        self.assertEqual(u"if", t.render(x=True))
-        self.assertEqual(u"else", t.render(x=False))
-        t = SimpleTemplate('%if x:\n%a="if"\n%else: a="else"\n{{a}}')
-        self.assertEqual(u"if", t.render(x=True))
-        self.assertEqual(u"else", t.render(x=False))
+        t = '%if x: a="if"\n%else: a="else"\n%end\n{{a}}'
+        self.assertRenders(t, "if", x=True)
+        self.assertRenders(t, "else", x=False)
+        t = '%if x:\n%a="if"\n%else: a="else"\n%end\n{{a}}'
+        self.assertRenders(t, "if", x=True)
+        self.assertRenders(t, "else", x=False)
         t = SimpleTemplate('%if x: a="if"\n%else: a="else"\n%end')
         self.assertRaises(NameError, t.render)
 
     def test_onelinebugs(self):
         ''' One-Line blocks should not change indention '''
-        t = SimpleTemplate('%if x:\n%a=1\n%end\n{{a}}')
-        self.assertEqual(u"1", t.render(x=True))
-        t = SimpleTemplate('%if x: a=1\n{{a}}')
-        self.assertEqual(u"1", t.render(x=True))
-        t = SimpleTemplate('%if x:\n%a=1\n%else:\n%a=2\n%end\n{{a}}')
-        self.assertEqual(u"1", t.render(x=True))
-        self.assertEqual(u"2", t.render(x=False))
-        t = SimpleTemplate('%if x:   a=1\n%else:\n%a=2\n%end\n{{a}}')
-        self.assertEqual(u"1", t.render(x=True))
-        self.assertEqual(u"2", t.render(x=False))
-        t = SimpleTemplate('%if x:\n%a=1\n%else:   a=2\n{{a}}')
-        self.assertEqual(u"1", t.render(x=True))
-        self.assertEqual(u"2", t.render(x=False))
-        t = SimpleTemplate('%if x:   a=1\n%else:   a=2\n{{a}}')
-        self.assertEqual(u"1", t.render(x=True))
-        self.assertEqual(u"2", t.render(x=False))
+        t = '%if x:\n%a=1\n%end\n{{a}}'
+        self.assertRenders(t, "1", x=True)
+        t = '%if x: a=1; end\n{{a}}'
+        self.assertRenders(t, "1", x=True)
+        t = '%if x:\n%a=1\n%else:\n%a=2\n%end\n{{a}}'
+        self.assertRenders(t, "1", x=True)
+        self.assertRenders(t, "2", x=False)
+        t = '%if x:   a=1\n%else:\n%a=2\n%end\n{{a}}'
+        self.assertRenders(t, "1", x=True)
+        self.assertRenders(t, "2", x=False)
+        t = '%if x:\n%a=1\n%else:   a=2; end\n{{a}}'
+        self.assertRenders(t, "1", x=True)
+        self.assertRenders(t, "2", x=False)
+        t = '%if x:   a=1\n%else:   a=2; end\n{{a}}'
+        self.assertRenders(t, "1", x=True)
+        self.assertRenders(t, "2", x=False)
 
     def test_onelineblocks(self):
         """ Templates: one line code blocks """
-        t = SimpleTemplate("start\n%a=''\n%for i in l: a += str(i)\n{{a}}\nend")
-        self.assertEqual(u'start\n123\nend', t.render(l=[1,2,3]))
-        self.assertEqual(u'start\n\nend', t.render(l=[]))
+        t = "start\n%a=''\n%for i in l: a += str(i); end\n{{a}}\nend"
+        self.assertRenders(t, 'start\n123\nend', l=[1,2,3])
+        self.assertRenders(t, 'start\n\nend', l=[])
 
     def test_escaped_codelines(self):
-        t = SimpleTemplate('%% test')
-        self.assertEqual(u'% test', t.render())
-        t = SimpleTemplate('%%% test')
-        self.assertEqual(u'%% test', t.render())
+        self.assertRenders('\\% test', '% test')
+        self.assertRenders('\\%% test', '%% test')
 
     def test_nobreak(self):
         """ Templates: Nobreak statements"""
-        t = SimpleTemplate("start\\\\\n%pass\nend")
-        self.assertEqual(u'startend', t.render())
-        
+        self.assertRenders("start\\\\\n%pass\nend", 'startend')
+
     def test_nonobreak(self):
         """ Templates: Escaped nobreak statements"""
-        t = SimpleTemplate("start\\\\\n\\\\\n%pass\nend")
-        self.assertEqual(u'start\\\\\nend', t.render())
+        self.assertRenders("start\\\\\n\\\\\n%pass\nend", 'start\\\\\nend')
 
     def test_include(self):
         """ Templates: Include statements"""
         t = SimpleTemplate(name='stpl_include', lookup=['./views/'])
-        self.assertEqual(u'before\nstart var end\nafter\n', t.render(var='var'))
+        self.assertRenders(t, 'before\nstart var end\nafter\n', var='var')
 
     def test_rebase(self):
         """ Templates: %rebase and method passing """
         t = SimpleTemplate(name='stpl_t2main', lookup=['./views/'])
-        result=u'+base+\n+main+\n!1234!\n+include+\n-main-\n+include+\n-base-\n'
-        self.assertEqual(result, t.render(content='1234'))
+        result='+base+\n+main+\n!1234!\n+include+\n-main-\n+include+\n-base-\n'
+        self.assertRenders(t, result, content='1234')
+
+    def test_get(self):
+        self.assertRenders('{{get("x", "default")}}', '1234', x='1234')
+        self.assertRenders('{{get("x", "default")}}', 'default')
+
+    def test_setdefault(self):
+        t = '%setdefault("x", "default")\n{{x}}'
+        self.assertRenders(t, '1234', x='1234')
+        self.assertRenders(t, 'default')
+
+    def test_defnied(self):
+        self.assertRenders('{{x if defined("x") else "no"}}', 'yes', x='yes')
+        self.assertRenders('{{x if defined("x") else "no"}}', 'no')
 
     def test_notfound(self):
         """ Templates: Unavailable templates"""
@@ -168,52 +176,155 @@ class TestSimpleTemplate(unittest.TestCase):
         """ Templates: Exceptions"""
         self.assertRaises(SyntaxError, lambda: SimpleTemplate('%for badsyntax').co)
         self.assertRaises(IndexError, SimpleTemplate('{{i[5]}}').render, i=[0])
-    
+
     def test_winbreaks(self):
         """ Templates: Test windows line breaks """
-        t = SimpleTemplate('%var+=1\r\n{{var}}\r\n')
-        t = t.render(var=5)
-        self.assertEqual(u'6\r\n', t)
+        self.assertRenders('%var+=1\r\n{{var}}\r\n', '6\r\n', var=5)
+
+    def test_winbreaks_end_bug(self):
+        d = { 'test': [ 1, 2, 3 ] }
+        self.assertRenders('%for i in test:\n{{i}}\n%end\n', '1\n2\n3\n', **d)
+        self.assertRenders('%for i in test:\n{{i}}\r\n%end\n', '1\r\n2\r\n3\r\n', **d)
+        self.assertRenders('%for i in test:\r\n{{i}}\n%end\r\n', '1\n2\n3\n', **d)
+        self.assertRenders('%for i in test:\r\n{{i}}\r\n%end\r\n', '1\r\n2\r\n3\r\n', **d)
 
     def test_commentonly(self):
         """ Templates: Commentd should behave like code-lines (e.g. flush text-lines) """
         t = SimpleTemplate('...\n%#test\n...')
-        self.failIfEqual('#test', t.code.splitlines()[0])
-
-    def test_detect_pep263(self):
-        ''' PEP263 strings in code-lines change the template encoding on the fly '''
-        t = SimpleTemplate(u'%#coding: iso8859_15\nöäü?@€'.encode('utf8'))
-        self.failIfEqual(u'öäü?@€', t.render())
-        self.assertEqual(t.encoding, 'iso8859_15')
-        t = SimpleTemplate(u'%#coding: iso8859_15\nöäü?@€'.encode('iso8859_15'))
-        self.assertEqual(u'öäü?@€', t.render())
-        self.assertEqual(t.encoding, 'iso8859_15')
-        self.assertEqual(2, len(t.code.splitlines()))
-
-    def test_ignore_pep263_in_textline(self):
-        ''' PEP263 strings in text-lines have no effect '''
-        self.assertRaises(UnicodeError, lambda: SimpleTemplate(u'#coding: iso8859_15\nöäü?@€'.encode('iso8859_15')).co)
-        t = SimpleTemplate(u'#coding: iso8859_15\nöäü?@€'.encode('utf8'))
-        self.assertEqual(u'#coding: iso8859_15\nöäü?@€', t.render())
-        self.assertEqual(t.encoding, 'utf8')
-
-    def test_ignore_late_pep263(self):
-        ''' PEP263 strings must appear within the first two lines '''
-        self.assertRaises(UnicodeError, lambda: SimpleTemplate(u'\n\n%#coding: iso8859_15\nöäü?@€'.encode('iso8859_15')).co)
-        t = SimpleTemplate(u'\n\n%#coding: iso8859_15\nöäü?@€'.encode('utf8'))
-        self.assertEqual(u'\n\nöäü?@€', t.render())
-        self.assertEqual(t.encoding, 'utf8')
+        self.assertNotEqual('#test', t.code.splitlines()[0])
 
     def test_template_shortcut(self):
         result = template('start {{var}} end', var='middle')
-        self.assertEqual(u'start middle end', result)
+        self.assertEqual(touni('start middle end'), result)
 
     def test_view_decorator(self):
         @view('start {{var}} end')
         def test():
             return dict(var='middle')
-        self.assertEqual(u'start middle end', test())
+        self.assertEqual(touni('start middle end'), test())
 
+    def test_view_decorator_issue_407(self):
+        @view('stpl_no_vars')
+        def test():
+            pass
+        self.assertEqual(touni('hihi'), test())
+        @view('aaa {{x}}', x='bbb')
+        def test2():
+            pass
+        self.assertEqual(touni('aaa bbb'), test2())
+
+    def test_global_config(self):
+        SimpleTemplate.global_config('meh', 1)
+        t = SimpleTemplate('anything')
+        self.assertEqual(touni('anything'), t.render())
+
+    def test_bug_no_whitespace_before_stmt(self):
+        self.assertRenders('\n{{var}}', '\nx', var='x')
+
+
+class TestSTPLDir(unittest.TestCase):
+    def fix_ident(self, string):
+        lines = string.splitlines(True)
+        if not lines: return string
+        if not lines[0].strip(): lines.pop(0)
+        whitespace = re.match('([ \t]*)', lines[0]).group(0)
+        if not whitespace: return string
+        for i in range(len(lines)):
+            lines[i] = lines[i][len(whitespace):]
+        return lines[0][:0].join(lines)
+
+    def assertRenders(self, source, result, syntax=None, *args, **vars):
+        source = self.fix_ident(source)
+        result = self.fix_ident(result)
+        tpl = SimpleTemplate(source, syntax=syntax)
+        try:
+            tpl.co
+            self.assertEqual(touni(result), tpl.render(*args, **vars))
+        except SyntaxError:
+            self.fail('Syntax error in template:\n%s\n\nTemplate code:\n##########\n%s\n##########' %
+                     (traceback.format_exc(), tpl.code))
+
+    def test_multiline_block(self):
+        source = '''
+            <% a = 5
+            b = 6
+            c = 7 %>
+            {{a+b+c}}
+        '''; result = '''
+            18
+        '''
+        self.assertRenders(source, result)
+
+    def test_multiline_ignore_eob_in_string(self):
+        source = '''
+            <% x=5 # a comment
+               y = '%>' # a string
+               # this is still code
+               # lets end this %>
+            {{x}}{{!y}}
+        '''; result = '''
+            5%>
+        '''
+        self.assertRenders(source, result)
+
+    def test_multiline_find_eob_in_comments(self):
+        source = '''
+            <% # a comment
+               # %> ignore because not end of line
+               # this is still code
+               x=5
+               # lets end this here %>
+            {{x}}
+        '''; result = '''
+            5
+        '''
+        self.assertRenders(source, result)
+
+    def test_multiline_indention(self):
+        source = '''
+            <%   if True:
+                   a = 2
+                     else:
+                       a = 0
+                         end
+            %>
+            {{a}}
+        '''; result = '''
+            2
+        '''
+        self.assertRenders(source, result)
+
+    def test_multiline_eob_after_end(self):
+        source = '''
+            <%   if True:
+                   a = 2
+                 end %>
+            {{a}}
+        '''; result = '''
+            2
+        '''
+        self.assertRenders(source, result)
+
+    def test_multiline_eob_in_single_line_code(self):
+        # eob must be a valid python expression to allow this test.
+        source = '''
+            cline eob=5; eob
+            xxx
+        '''; result = '''
+            xxx
+        '''
+        self.assertRenders(source, result, syntax='sob eob cline foo bar')
+
+    def test_multiline_strings_in_code_line(self):
+        source = '''
+            % a = """line 1
+                  line 2"""
+            {{a}}
+        '''; result = '''
+            line 1
+                  line 2
+        '''
+        self.assertRenders(source, result)
 
 if __name__ == '__main__': #pragma: no cover
     unittest.main()
